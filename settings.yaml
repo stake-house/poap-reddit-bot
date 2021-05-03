@@ -1,0 +1,7 @@
+reddit:
+  auth:
+    username: POAPbot
+    password: 
+    client_id: 
+    client_secret: 
+    user_agent: "POAPbot by /u/Bad_Investment https://github.com/badinvestment/poap-reddit-bot"
