@@ -18,4 +18,3 @@ class Claim(ormar.Model):
     event: Event = ormar.ForeignKey(Event)
     link: str = ormar.String(max_length=256)
     notified: Optional[bool] = ormar.Boolean(default=False)
-    request_message: RequestMessage = ormar.ForeignKey(RequestMessage)
