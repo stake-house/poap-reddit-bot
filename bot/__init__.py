@@ -12,14 +12,18 @@ class RedditBot:
         self.client = client
 
     async def message_handler(self, message: Message):
-        request_message = RequestMessage(
-            id=message.id, 
-            author=message.author.name, 
-            created=message.created_utc, 
-            subject=message.subject, 
-            body=message.body
-        )
-        await request_message.upsert()
+        request_message = await RequestMessage.objects.get_or_none(id=message.id)
+        if not request_message:
+            request_message = RequestMessage(
+                id=message.id, 
+                author=message.author.name, 
+                created=message.created_utc, 
+                subject=message.subject, 
+                body=message.body
+            )
+            await request_message.upsert()
+        else:
+            return
 
         if message.body and 'ping' in message.body.lower():
             await message.reply('pong')
@@ -31,7 +35,6 @@ class RedditBot:
                     await message.reply(f'Sorry, your claim for {claim.event.id} has expired')
                 else:
                     await message.reply(f'Your claim link for {claim.event.id} is {claim.link}')
-                claim.request_message = request_message
                 claim.notified = True
                 await claim.update()
             else:
