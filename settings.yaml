@@ -5,3 +5,13 @@ reddit:
     client_id: 
     client_secret: 
     user_agent: "POAPbot by /u/Bad_Investment https://github.com/badinvestment/poap-reddit-bot"
+
+db:
+  url: sqlite:///test.db
+
+fastapi:
+  title: Reddit POAP Bot
+  version: 0.1.0
+  openapi_tags:
+    - name: admin
+    - name: scrape

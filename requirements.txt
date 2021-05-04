@@ -1,5 +1,9 @@
-pydantic==1.8.1
+pydantic==1.7
 fastapi==0.63.0
 uvicorn[standard]
 asyncpraw==7.2.0
 pyyaml==5.4.1
+fastapi-crudrouter==0.7.1
+ormar[sqlite]==0.10.5
+python-multipart==0.0.5
+pandas

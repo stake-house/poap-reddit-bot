@@ -1,6 +1,6 @@
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseSettings, SecretStr
 
-class AuthSettings(BaseModel):
+class AuthSettings(BaseSettings):
     username: str
     password: SecretStr
     client_id: str
@@ -10,5 +10,5 @@ class AuthSettings(BaseModel):
     class Config:
         env_prefix = 'reddit_auth_'
 
-class RedditSettings(BaseModel):
+class RedditSettings(BaseSettings):
     auth: AuthSettings
