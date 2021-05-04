@@ -10,7 +10,17 @@ class RequestMessage(ormar.Model):
         tablename = "request_messages"
 
     id: int = ormar.String(primary_key=True, max_length=100)
-    author: str = ormar.String(max_length=100)
+    username: str = ormar.String(max_length=100)
     created: datetime = ormar.DateTime()
-    subject: str = ormar.String(max_length=1024)
+    subject: str = ormar.String(max_length=1024, nullable=True)
+    body: str = ormar.String(max_length=1024)
+
+class ResponseMessage(ormar.Model):
+
+    class Meta(BaseMeta):
+        tablename = "response_messages"
+
+    id: int = ormar.String(primary_key=True, max_length=100)
+    username: str = ormar.String(max_length=100)
+    created: datetime = ormar.DateTime()
     body: str = ormar.String(max_length=1024)

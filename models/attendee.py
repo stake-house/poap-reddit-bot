@@ -11,4 +11,6 @@ class Attendee(ormar.Model):
         tablename = "attendees"
 
     id: str = ormar.String(primary_key=True, max_length=100)
-    attended_events: Optional[List[Event]] = ormar.ManyToMany(Event)
+    username: str = ormar.String(max_length=100)
+    channel: str = ormar.String(max_length=100, choices=['DISCORD','REDDIT'])
+    events: Optional[List[Event]] = ormar.ManyToMany(Event)

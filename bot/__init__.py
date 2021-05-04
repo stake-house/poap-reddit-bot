@@ -13,17 +13,17 @@ class RedditBot:
 
     async def message_handler(self, message: Message):
         request_message = await RequestMessage.objects.get_or_none(id=message.id)
-        if not request_message:
+        if request_message:
+            return
+        else:
             request_message = RequestMessage(
                 id=message.id, 
-                author=message.author.name, 
+                username=message.author.name, 
                 created=message.created_utc, 
                 subject=message.subject, 
                 body=message.body
             )
-            await request_message.upsert()
-        else:
-            return
+            await request_message.save()
 
         if message.body and 'ping' in message.body.lower():
             await message.reply('pong')
