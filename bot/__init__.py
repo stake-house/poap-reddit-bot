@@ -29,7 +29,7 @@ class RedditBot:
             await message.reply('pong')
         elif message.body:
             code = message.body.split(' ')[0].lower()
-            claim = await Claim.objects.filter(event__id__exact=code, participant__id__exact=message.author.name.lower()).get_or_none()
+            claim = await Claim.objects.filter(event__id__exact=code, attendee__id__exact=message.author.name.lower()).get_or_none()
             if claim:
                 if claim.event.expiry_date < datetime.utcnow():
                     await message.reply(f'Sorry, your claim for {claim.event.id} has expired')

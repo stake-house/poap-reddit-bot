@@ -17,6 +17,6 @@ class BaseMeta(ormar.ModelMeta):
     database = database
 
 from .event import Event
-from .participant import Participant
+from .attendee import Attendee
 from .claim import Claim
 from .message import RequestMessage

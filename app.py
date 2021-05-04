@@ -20,7 +20,7 @@ API_SETTINGS = FastAPISettings.parse_obj(SETTINGS['fastapi'])
 
 from scraper import RedditScraper
 from bot import RedditBot
-from models import metadata, database, Event, Participant, Claim
+from models import metadata, database, Event, Attendee, Claim
 
 engine = sqlalchemy.create_engine(DB_SETTINGS.url)
 metadata.create_all(engine)
@@ -31,7 +31,7 @@ app = FastAPI(
     openapi_tags=API_SETTINGS.openapi_tags
 )
 app.include_router(CRUDRouter(schema=Event, prefix='event'))
-app.include_router(CRUDRouter(schema=Participant, prefix='participant'))
+app.include_router(CRUDRouter(schema=Attendee, prefix='attendee'))
 app.include_router(CRUDRouter(schema=Claim, prefix='claim'))
 app.state.database = database
                 
@@ -87,11 +87,11 @@ async def grant_claim(request: Request, event_id: str, username: str, link: str)
     except ormar.exceptions.NoMatch:
         raise HTTPException(status_code=404, detail=f'Event with id "{event_id}" does not exist')
     try:
-        participant = await Participant.objects.get(pk=username)
+        attendee = await Attendee.objects.get(pk=username)
     except ormar.exceptions.NoMatch:
-        raise HTTPException(status_code=404, detail=f'Participant with username "{username}" does not exist')
+        raise HTTPException(status_code=404, detail=f'Attendee with username "{username}" does not exist')
     try:
-        claim = Claim(event=event, participant=participant, link=link)
+        claim = Claim(event=event, attendee=attendee, link=link)
         await claim.save()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -121,18 +121,18 @@ async def upload_claims(request: Request, event_id: str, file: UploadFile = File
     usernames = df['username'].tolist()
     claim_map = df.set_index('username')['link'].to_dict()
 
-    existing_participants = await Participant.objects.filter(id__in=usernames).all()
-    existing_claims = await Claim.objects.filter(ormar.and_(event__id__exact=event_id, participant__id__in=usernames)).all()
-    existing_claim_usernames = [c.participant.id for c in existing_claims]
+    existing_attendees = await Attendee.objects.filter(id__in=usernames).all()
+    existing_claims = await Claim.objects.filter(ormar.and_(event__id__exact=event_id, attendee__id__in=usernames)).all()
+    existing_claim_usernames = [c.attendee.id for c in existing_claims]
     
-    new_participants = [Participant(id=username) for username in usernames if username not in [p.id for p in existing_participants]]
-    await Participant.objects.bulk_create(new_participants)
+    new_attendees = [Attendee(id=username) for username in usernames if username not in [p.id for p in existing_attendees]]
+    await Attendee.objects.bulk_create(new_attendees)
 
-    participants = existing_participants + new_participants
+    attendees = existing_attendees + new_attendees
 
-    for participant in participants:
-        if participant.id not in existing_claim_usernames:
-            claim = Claim(event=event, participant=participant, link=claim_map[participant.id])
+    for attendee in attendees:
+        if attendee.id not in existing_claim_usernames:
+            claim = Claim(event=event, attendee=attendee, link=claim_map[attendee.id])
             await claim.save()
 
     return True
