@@ -38,6 +38,7 @@ app.include_router(CRUDRouter(schema=RequestMessage, prefix='request_message'))
 app.state.database = database
 
 logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
+logger = logging.getLogger(__name__)
                 
 @app.on_event('startup')
 async def startup_event():
@@ -81,26 +82,6 @@ async def create_event(request: Request, id: str, name: str, code: str, expiry_d
         return event
 
 @app.post(
-    "/admin/grant_claim",
-    tags=['admin'],
-    response_model=Claim
-)
-async def grant_claim(request: Request, event_id: str, username: str, link: str):
-    try:
-        event = await Event.objects.get(pk=event_id)
-    except ormar.exceptions.NoMatch:
-        raise HTTPException(status_code=404, detail=f'Event with id "{event_id}" does not exist')
-    try:
-        attendee = await Attendee.objects.get(pk=username)
-    except ormar.exceptions.NoMatch:
-        raise HTTPException(status_code=404, detail=f'Attendee with username "{username}" does not exist')
-    try:
-        claim = Claim(event=event, attendee=attendee, link=link)
-        await claim.save()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post(
     "/admin/upload_claims",
     tags=['admin']
 )
@@ -118,28 +99,43 @@ async def upload_claims(request: Request, event_id: str, file: UploadFile = File
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to parse file: {e}')
 
-    if any([c not in df.columns for c in ['username','link']]):
-        raise HTTPException(status_code=400, detail=f'List must contain "username" and "link" columns')
-    
+    if 'link' not in df.columns:
+        raise HTTPException(status_code=400, detail=f'List must have "link" column header')
+    elif 'username' not in df.columns:
+        df['username'] = ''
+
+    df = df.fillna('')
     df['username'] = df['username'].apply(lambda x: x.lower())
-    usernames = df['username'].tolist()
-    claim_map = df.set_index('username')['link'].to_dict()
-
-    existing_attendees = await Attendee.objects.filter(id__in=usernames).all()
-    existing_claims = await Claim.objects.filter(ormar.and_(event__id__exact=event_id, attendee__username__in=usernames)).all()
-    existing_claim_usernames = [c.attendee.username for c in existing_claims]
     
-    new_attendees = [Attendee(id=username) for username in usernames if username not in [p.id for p in existing_attendees]]
-    await Attendee.objects.bulk_create(new_attendees)
+    existing_claims = await Claim.objects.filter(event__id__exact=event_id).all()
+    existing_links = {c.link:c for c in existing_claims}
+    existing_usernames = {c.attendee.username:c for c in existing_claims if c.attendee}
 
-    attendees = existing_attendees + new_attendees
+    success = 0
+    rejected = []
+    for index, row in df.iterrows():
+        if row.username in existing_usernames:
+            rejected.append({'index':index, 'reason':f'Username {row.username} already has reserved claim'})
+            continue
+        elif row.link in existing_links:
+            rejected.append({'index':index, 'reason':f'Claim link {row.link} already exists'})
+            continue
+        elif not row.link:
+            rejected.append({'index':index, 'reason':f'Invalid link {row.link}'})
+        
+        attendee = await Attendee.objects.get_or_create(username=row.username) if row.username else None
+        claim = Claim(attendee=attendee, event=event, link=row.link, reserved=True if attendee else False)
 
-    for attendee in attendees:
-        if attendee.id not in existing_claim_usernames:
-            claim = Claim(event=event, attendee=attendee, link=claim_map[attendee.id])
+        async with request.app.state.database.transaction():
+            if attendee:
+                await attendee.upsert()
             await claim.save()
-
-    return True
+        success += 1
+    
+    return {
+        'success': success,
+        'rejected': rejected
+    }
 
 @app.get(
     "/scrape/get_usernames_by_submission",
