@@ -7,3 +7,4 @@ fastapi-crudrouter==0.7.1
 ormar[sqlite]==0.10.5
 python-multipart==0.0.5
 pandas
+colorlog

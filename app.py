@@ -10,6 +10,7 @@ import asyncpraw
 import pandas as pd
 from datetime import datetime
 from typing import Optional
+import logging
 
 from poapbot.models.settings import RedditSettings, DBSettings, FastAPISettings
 
@@ -20,7 +21,7 @@ API_SETTINGS = FastAPISettings.parse_obj(SETTINGS['fastapi'])
 
 from poapbot.scraper import RedditScraper
 from poapbot.bot import RedditBot
-from poapbot.models import metadata, database, Event, Attendee, Claim
+from poapbot.models import metadata, database, Event, Attendee, Claim, RequestMessage
 
 engine = sqlalchemy.create_engine(DB_SETTINGS.url)
 metadata.create_all(engine)
@@ -33,7 +34,10 @@ app = FastAPI(
 app.include_router(CRUDRouter(schema=Event, prefix='event'))
 app.include_router(CRUDRouter(schema=Attendee, prefix='attendee'))
 app.include_router(CRUDRouter(schema=Claim, prefix='claim'))
+app.include_router(CRUDRouter(schema=RequestMessage, prefix='request_message'))
 app.state.database = database
+
+logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
                 
 @app.on_event('startup')
 async def startup_event():

@@ -7,7 +7,7 @@ import ormar
 
 from ..models import database, Event, Claim, Attendee, RequestMessage
 
-logger = logging.getLogger('redditbot')
+logger = logging.getLogger(__name__)
 
 class RedditBot:
 
@@ -23,6 +23,10 @@ class RedditBot:
             await message.mark_read()
             logger.info('Received ping, sending pong')
             return
+        elif username == 'reddit':
+            await message.mark_read()
+            logger.info('Received message from reddit, skipping')
+            return
 
         request_message = await RequestMessage.objects.get_or_none(id=message.id)
         if request_message:
@@ -32,7 +36,7 @@ class RedditBot:
         else:
             request_message = RequestMessage(
                 id=message.id, 
-                username=message.author.name, 
+                username=username, 
                 created=message.created_utc, 
                 subject=message.subject, 
                 body=message.body
