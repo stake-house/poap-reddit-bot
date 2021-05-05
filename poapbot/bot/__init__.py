@@ -49,6 +49,7 @@ class RedditBot:
             claim = await Claim.objects.filter(ormar.and_(attendee__username__exact=username, event__id__exact=event.id)).get_or_none()
             if claim:
                 comment = await message.reply(f'Your claim link for {claim.event.name} is {claim.link}')
+                logger.debug(f'Received valid request from {username} for event {event.id}, sending link {claim.link}')
             elif not expired:
                 claim = await Claim.objects.filter(ormar.and_(attendee__id__isnull=True, reserved__exact=False, event__id__exact=event.id)).get_or_none()
                 if claim:
@@ -59,12 +60,16 @@ class RedditBot:
                         claim.reserved = True
                         await claim.update()
                     comment = await message.reply(f'Your claim link for {claim.event.name} is {claim.link}')
+                    logger.debug(f'Received request from {username} for event {event.id}, reserved claim and sent link')
                 else:
                     comment = await message.reply(f'Sorry, there are no more claims available for {event.name}')
+                    logger.debug(f'Received request from {username} for event {event.id}, but no more claims are available')
             elif expired:
                 comment = await message.reply(f'Sorry, event {event.name} has expired')
+                logger.debug(f'Received request from {username} for event {event.id}, but event has expired')
         else:
             comment = await message.reply(f'Invalid event code: {code}')
+            logger.debug(f'Received request from {username} with invalid code {code}')
 
         await message.mark_read()
 
