@@ -11,16 +11,16 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional
 
-from models.settings import RedditSettings, DBSettings, FastAPISettings
+from poapbot.models.settings import RedditSettings, DBSettings, FastAPISettings
 
 SETTINGS = yaml.safe_load(open('settings.yaml', 'r'))
 REDDIT_SETTINGS = RedditSettings.parse_obj(SETTINGS['reddit'])
 DB_SETTINGS = DBSettings.parse_obj(SETTINGS['db'])
 API_SETTINGS = FastAPISettings.parse_obj(SETTINGS['fastapi'])
 
-from scraper import RedditScraper
-from bot import RedditBot
-from models import metadata, database, Event, Attendee, Claim
+from poapbot.scraper import RedditScraper
+from poapbot.bot import RedditBot
+from poapbot.models import metadata, database, Event, Attendee, Claim
 
 engine = sqlalchemy.create_engine(DB_SETTINGS.url)
 metadata.create_all(engine)
@@ -67,12 +67,12 @@ async def shutdown():
     tags=['admin'],
     response_model=Event
 )
-async def create_event(request: Request, id: str, expiry_date: datetime, description: Optional[str] = ""):
+async def create_event(request: Request, id: str, name: str, code: str, expiry_date: datetime, description: Optional[str] = ""):
     existing_event = await Event.objects.get_or_none(pk=id)
     if existing_event:
         raise HTTPException(status_code=409, detail=f'Event with id "{id}" already exists')
     else:
-        event = Event(id=id, description=description, expiry_date=expiry_date)
+        event = Event(id=id, name=name, code=code, description=description, expiry_date=expiry_date)
         await event.save()
         return event
 
@@ -122,8 +122,8 @@ async def upload_claims(request: Request, event_id: str, file: UploadFile = File
     claim_map = df.set_index('username')['link'].to_dict()
 
     existing_attendees = await Attendee.objects.filter(id__in=usernames).all()
-    existing_claims = await Claim.objects.filter(ormar.and_(event__id__exact=event_id, attendee__id__in=usernames)).all()
-    existing_claim_usernames = [c.attendee.id for c in existing_claims]
+    existing_claims = await Claim.objects.filter(ormar.and_(event__id__exact=event_id, attendee__username__in=usernames)).all()
+    existing_claim_usernames = [c.attendee.username for c in existing_claims]
     
     new_attendees = [Attendee(id=username) for username in usernames if username not in [p.id for p in existing_attendees]]
     await Attendee.objects.bulk_create(new_attendees)

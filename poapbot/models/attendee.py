@@ -9,8 +9,8 @@ class Attendee(ormar.Model):
     
     class Meta(BaseMeta):
         tablename = "attendees"
+        constraints = [ormar.UniqueColumns('username')]
 
-    id: str = ormar.String(primary_key=True, max_length=100)
+    id: str = ormar.Integer(primary_key=True)
     username: str = ormar.String(max_length=100)
-    channel: str = ormar.String(max_length=100, choices=['DISCORD','REDDIT'])
     events: Optional[List[Event]] = ormar.ManyToMany(Event)
