@@ -5,7 +5,7 @@ from datetime import datetime
 import logging
 import ormar
 
-from ..models import database, Event, Claim, Attendee, RequestMessage
+from ..models import database, Event, Claim, Attendee, RequestMessage, ResponseMessage
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +28,14 @@ class RedditBot:
             logger.info('Received message from reddit, skipping')
             return
 
-        request_message = await RequestMessage.objects.get_or_none(id=message.id)
+        request_message = await RequestMessage.objects.get_or_none(secondary_id=message.id)
         if request_message:
             logger.debug(f'Request message {request_message.id} has already been processed, skipping')
             await message.mark_read()
             return
         else:
             request_message = RequestMessage(
-                id=message.id, 
+                secondary_id=message.id, 
                 username=username, 
                 created=message.created_utc, 
                 subject=message.subject, 
@@ -67,11 +67,16 @@ class RedditBot:
             elif expired:
                 comment = await message.reply(f'Sorry, event {event.name} has expired')
                 logger.debug(f'Received request from {username} for event {event.id}, but event has expired')
+            else:
+                comment = await message.reply(f'Sorry, there are no more claims available for {event.name}')
+                logger.debug(f'Received request from {username} for event {event.id}, but no more claims are available')
         else:
             comment = await message.reply(f'Invalid event code: {code}')
             logger.debug(f'Received request from {username} with invalid code {code}')
 
         await message.mark_read()
+        response_message = ResponseMessage(secondary_id=comment.id, username=comment.author.name.lower(), created=comment.created_utc, body=comment.body, claim=claim)
+        await response_message.save()
 
     async def run(self):
         while True:
@@ -82,5 +87,5 @@ class RedditBot:
             except asyncio.CancelledError:
                 return
             except:
-                logging.error('Encountered error in run loop', exc_info=True)
+                logger.error('Encountered error in run loop', exc_info=True)
             await asyncio.sleep(1)

@@ -21,7 +21,7 @@ API_SETTINGS = FastAPISettings.parse_obj(SETTINGS['fastapi'])
 
 from poapbot.scraper import RedditScraper
 from poapbot.bot import RedditBot
-from poapbot.models import metadata, database, Event, Attendee, Claim, RequestMessage
+from poapbot.models import metadata, database, Event, Attendee, Claim, RequestMessage, ResponseMessage
 
 engine = sqlalchemy.create_engine(DB_SETTINGS.url)
 metadata.create_all(engine)
@@ -31,10 +31,11 @@ app = FastAPI(
     version=API_SETTINGS.version,
     openapi_tags=API_SETTINGS.openapi_tags
 )
-app.include_router(CRUDRouter(schema=Event, prefix='event'))
-app.include_router(CRUDRouter(schema=Attendee, prefix='attendee'))
-app.include_router(CRUDRouter(schema=Claim, prefix='claim'))
-app.include_router(CRUDRouter(schema=RequestMessage, prefix='request_message'))
+app.include_router(CRUDRouter(schema=Event))
+app.include_router(CRUDRouter(schema=Attendee))
+app.include_router(CRUDRouter(schema=Claim))
+app.include_router(CRUDRouter(schema=RequestMessage))
+app.include_router(CRUDRouter(schema=ResponseMessage))
 app.state.database = database
 
 logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
