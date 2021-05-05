@@ -13,7 +13,7 @@ class Claim(ormar.Model):
         constraints = [ormar.UniqueColumns('attendee','event')]
 
     id: int = ormar.Integer(primary_key=True)
-    attendee: Attendee = ormar.ForeignKey(Attendee, nullable=True)
-    event: Event = ormar.ForeignKey(Event)
+    attendee: Attendee = ormar.ForeignKey(Attendee, nullable=True, skip_reverse=True)
+    event: Event = ormar.ForeignKey(Event, skip_reverse=True)
     link: str = ormar.String(max_length=256)
     reserved: Optional[bool] = ormar.Boolean(default=False)
