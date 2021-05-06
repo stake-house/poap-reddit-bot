@@ -106,7 +106,6 @@ async def upload_claims(request: Request, event_id: str, file: UploadFile = File
         df['username'] = ''
 
     df = df.fillna('')
-    df['username'] = df['username'].apply(lambda x: x.lower())
     
     existing_claims = await Claim.objects.filter(event__id__exact=event_id).all()
     existing_links = {c.link:c for c in existing_claims}

@@ -15,7 +15,7 @@ class RedditBot:
         self.client = client
 
     async def message_handler(self, message: Message):
-        username = message.author.name.lower() if message.author else None
+        username = message.author.name if message.author else None
         code = message.body.split(' ')[0].lower()
 
         if code == 'ping':
@@ -76,7 +76,7 @@ class RedditBot:
             logger.debug(f'Received request from {username} with invalid code {code}')
 
         await message.mark_read()
-        response_message = ResponseMessage(secondary_id=comment.id, username=comment.author.name.lower(), created=comment.created_utc, body=comment.body, claim=claim)
+        response_message = ResponseMessage(secondary_id=comment.id, username=comment.author.name, created=comment.created_utc, body=comment.body, claim=claim)
         await response_message.save()
 
     async def run(self):
