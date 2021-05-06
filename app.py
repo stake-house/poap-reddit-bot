@@ -73,12 +73,29 @@ async def shutdown():
     tags=['admin'],
     response_model=Event
 )
-async def create_event(request: Request, id: str, name: str, code: str, expiry_date: datetime, description: Optional[str] = ""):
+async def create_event(
+    request: Request, 
+    id: str, 
+    name: str, 
+    code: str, 
+    expiry_date: datetime, 
+    description: Optional[str] = "",
+    minimum_age: Optional[int] = 0,
+    minimum_karma: Optional[int] = 0
+    ):
     existing_event = await Event.objects.get_or_none(pk=id)
     if existing_event:
         raise HTTPException(status_code=409, detail=f'Event with id "{id}" already exists')
     else:
-        event = Event(id=id, name=name, code=code, description=description, expiry_date=expiry_date)
+        event = Event(
+            id=id, 
+            name=name, 
+            code=code, 
+            description=description, 
+            expiry_date=expiry_date,
+            minimum_age=minimum_age,
+            minimum_karma=minimum_karma
+        )
         await event.save()
         return event
 

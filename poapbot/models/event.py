@@ -15,5 +15,8 @@ class Event(ormar.Model):
     code: str = ormar.String(max_length=256)
     expiry_date: datetime = ormar.DateTime()
 
+    minimum_karma: int = ormar.Integer(default=0)
+    minimum_age: int = ormar.Integer(default=0)
+
     def expired(self):
         return self.expiry_date < datetime.utcnow()

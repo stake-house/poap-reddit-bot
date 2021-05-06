@@ -6,7 +6,7 @@ import logging
 import ormar
 
 from ..models import database, Event, Claim, Attendee, RequestMessage, ResponseMessage
-from .exceptions import ExpiredEvent, NoClaimsAvailable, InvalidCode
+from .exceptions import ExpiredEvent, NoClaimsAvailable, InvalidCode, InsufficientAccountAge, InsufficientKarma
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,13 @@ class RedditBot:
         existing_claim = await Claim.objects.filter(attendee__username=redditor.name, event__id__exact=event.id).get_or_none()
         if existing_claim:
             return existing_claim
+
+        await redditor.load()
+        age = (datetime.utcnow() - datetime.utcfromtimestamp(int(redditor.created_utc))).total_seconds() // 86400 # seconds in a day
+        if redditor.comment_karma + redditor.link_karma < event.minimum_karma:
+            raise InsufficientKarma(redditor)
+        elif age < event.minimum_age:
+            raise InsufficientAccountAge(redditor)
 
         async with database.transaction():
             try:
@@ -85,6 +92,12 @@ class RedditBot:
         except NoClaimsAvailable as e:
             comment = await message.reply(f'Sorry, there are no more claims available for {e.event.name}')
             logger.debug(f'Received request from {redditor.name} for event {e.event.id}, but no more claims are available')
+        except InsufficientAccountAge as e:
+            comment = await message.reply(f'Sorry, your account is not old enough to be eligible')
+            logger.debug(f'Received request from {redditor.name} for event {e.event.id}, but account is too young')
+        except InsufficientKarma as e:
+            comment = await message.reply(f'Sorry, your account does not have enough karma to be eligible')
+            logger.debug(f'Received request from {redditor.name} for event {e.event.id}, but not enough karma')
 
         await message.mark_read()
         response_message = ResponseMessage(secondary_id=comment.id, username=comment.author.name, created=comment.created_utc, body=comment.body, claim=claim)
