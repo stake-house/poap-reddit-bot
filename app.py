@@ -227,6 +227,12 @@ async def get_usernames_by_comment(request: Request, comment_id: str, traverse: 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def data_to_csv_response(data, filename):
+    stream = StringIO(pd.DataFrame(data).fillna('').to_csv(index=False))
+    response = StreamingResponse(stream, media_type="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}-{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}.csv"
+    return response
+
 @app.get(
     "/export/events",
     tags=['export']
@@ -234,10 +240,7 @@ async def get_usernames_by_comment(request: Request, comment_id: str, traverse: 
 async def export_events(request: Request):
     events = await Event.objects.all()
     data = [event.dict() for event in events]
-    stream = StringIO(pd.DataFrame(data).fillna('').to_csv(index=False))
-    response = StreamingResponse(stream, media_type="text/csv")
-    response.headers["Content-Disposition"] = f"attachment; filename=events-{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}.csv"
-    return response
+    return data_to_csv_response(data, 'events')
 
 @app.get(
     "/export/attendees",
@@ -246,10 +249,7 @@ async def export_events(request: Request):
 async def export_attendees(request: Request):
     attendees = await Attendee.objects.all()
     data = [attendee.dict() for attendee in attendees]
-    stream = StringIO(pd.DataFrame(data).fillna('').to_csv(index=False))
-    response = StreamingResponse(stream, media_type="text/csv")
-    response.headers["Content-Disposition"] = f"attachment; filename=attendees-{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}.csv"
-    return response
+    return data_to_csv_response(data, 'attendees')
 
 @app.get(
     "/export/claims",
@@ -266,10 +266,7 @@ async def export_claims(request: Request):
             link=claim.link,
             attendee_username=claim.attendee.username if claim.attendee else ''
         ))
-    stream = StringIO(pd.DataFrame(data).fillna('').to_csv(index=False))
-    response = StreamingResponse(stream, media_type="text/csv")
-    response.headers["Content-Disposition"] = f"attachment; filename=claims-{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}.csv"
-    return response
+    return data_to_csv_response(data, 'claims')
 
 @app.get(
     "/export/claims/{event_id}",
@@ -286,7 +283,4 @@ async def export_claims_by_event(request: Request, event_id: str):
             link=claim.link,
             attendee_username=claim.attendee.username if claim.attendee else ''
         ))
-    stream = StringIO(pd.DataFrame(data).fillna('').to_csv(index=False))
-    response = StreamingResponse(stream, media_type="text/csv")
-    response.headers["Content-Disposition"] = f"attachment; filename={event_id}-claims-{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}.csv"
-    return response
+    return data_to_csv_response(data, f'claims-{event_id}')
