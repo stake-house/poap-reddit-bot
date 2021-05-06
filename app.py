@@ -86,40 +86,6 @@ async def create_admin(request: Request, username: str):
     return admin
 
 @app.post(
-    "/admin/event",
-    description="Create Event",
-    tags=['admin'],
-    response_model=Event
-)
-async def create_event(
-    request: Request, 
-    id: str, 
-    name: str, 
-    code: str,
-    start_date: datetime,
-    expiry_date: datetime, 
-    description: Optional[str] = "",
-    minimum_age: Optional[int] = 0,
-    minimum_karma: Optional[int] = 0
-    ):
-    existing_event = await Event.objects.get_or_none(pk=id)
-    if existing_event:
-        raise HTTPException(status_code=409, detail=f'Event with id "{id}" already exists')
-    else:
-        event = Event(
-            id=id, 
-            name=name, 
-            code=code.lower(), 
-            description=description,
-            start_date=start_date,
-            expiry_date=expiry_date,
-            minimum_age=minimum_age,
-            minimum_karma=minimum_karma
-        )
-        await event.save()
-        return event
-
-@app.post(
     "/admin/upload_claims",
     tags=['admin']
 )
@@ -188,7 +154,36 @@ async def upload_claims(request: Request, event_id: str, file: UploadFile = File
     tags=['claims']
 )
 async def get_claim_by_id(request: Request, id: str):
-    return await Claim.objects.get_or_none(id=id)
+    claim = await Claim.objects.get_or_none(id=id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f'Claim with id {id} does not exist')
+    return claim
+
+@app.post(
+    "/claims/",
+    tags=['claims']
+)
+async def create_claim(request: Request, event_id: str, link: str, username: str = None):
+    event = await Event.objects.get_or_none(pk=event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail=f'Event with id {event_id} does not exist')
+    if username:
+        attendee = Attendee.objects.get_or_create(username=username)
+    else:
+        attendee = None
+    claim = Claim(event=event, attendee=attendee, link=link, reserved=True if attendee else False)
+    await claim.save()
+    return claim
+
+@app.delete(
+    "/claims/{id}",
+    tags=['claims']
+)
+async def delete_claim(request: Request, id: str):
+    claim = await Claim.objects.get_or_none(pk=id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f'Claim with id {id} does not exist')
+    await claim.delete()
 
 @app.put(
     "/claims/{id}/clear_attendee",
@@ -198,7 +193,7 @@ async def clear_claim_attendee(request: Request, id: str):
     try:
         claim = await Claim.objects.get(pk=id)
     except ormar.exceptions.NoMatch:
-        raise HTTPException(status_code=404, detail=f'Claim with id "{id}" does not exist')
+        raise HTTPException(status_code=404, detail=f'Claim with id {id} does not exist')
 
     async with request.app.state.database.transaction():
         claim.remove(claim.attendee, 'attendee')
@@ -213,12 +208,94 @@ async def update_claim_attendee(request: Request, id: str, username: str):
     try:
         claim = await Claim.objects.get(pk=id)
     except ormar.exceptions.NoMatch:
-        raise HTTPException(status_code=404, detail=f'Claim with id "{id}" does not exist')
+        raise HTTPException(status_code=404, detail=f'Claim with id {id} does not exist')
 
     attendee = await Attendee.objects.get_or_create(username=username)
     claim.attendee = attendee
     claim.reserved = True
     await claim.update()
+
+@app.post(
+    "/events/",
+    description="Create Event",
+    tags=['events'],
+    response_model=Event
+)
+async def create_event(
+    request: Request, 
+    id: str, 
+    name: str, 
+    code: str,
+    start_date: datetime,
+    expiry_date: datetime, 
+    description: Optional[str] = "",
+    minimum_age: Optional[int] = 0,
+    minimum_karma: Optional[int] = 0
+    ):
+    existing_event = await Event.objects.get_or_none(pk=id)
+    if existing_event:
+        raise HTTPException(status_code=409, detail=f'Event with id {id} already exists')
+    event = Event(
+        id=id, 
+        name=name, 
+        code=code.lower(), 
+        description=description,
+        start_date=start_date,
+        expiry_date=expiry_date,
+        minimum_age=minimum_age,
+        minimum_karma=minimum_karma
+    )
+    await event.save()
+    return event
+
+@app.get(
+    "/events/{id}",
+    tags=['events']
+)
+async def get_event_by_id(request: Request, id: str):
+    event = await Event.objects.get_or_none(id=id)
+    if not event:
+        raise HTTPException(status_code=404, detail=f'Event with id {id} does not exist')
+    return event
+
+@app.put(
+    "/events/{id}",
+    tags=['events']
+)
+async def update_event(
+    request: Request, 
+    id: str, 
+    code: str = None, 
+    start_date: datetime = None, 
+    end_date: datetime = None, 
+    minimum_karma: int = None,
+    minimum_age: int = None
+    ):
+    event = await Event.objects.get_or_none(pk=id)
+    if not event:
+        raise HTTPException(status_code=404, detail=f'Event with id {id} does not exist')
+    if code:
+        event.code = code
+    if start_date:
+        event.start_date = start_date
+    if end_date:
+        event.end_date = end_date
+    if minimum_karma:
+        event.minimum_karma = minimum_karma
+    if minimum_age:
+        event.minimum_age = minimum_age
+    await event.update()
+    return event
+
+@app.delete(
+    "/events/{id}",
+    tags=['events']
+)
+async def delete_event(request: Request, id: str):
+    try:
+        await Event.objects.delete(pk=id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get(
     "/scrape/get_usernames_by_submission",
