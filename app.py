@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException, File, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from fastapi_crudrouter import OrmarCRUDRouter as CRUDRouter
 import asyncio
 import sqlalchemy
@@ -32,11 +32,11 @@ app = FastAPI(
     version=API_SETTINGS.version,
     openapi_tags=API_SETTINGS.openapi_tags
 )
-app.include_router(CRUDRouter(schema=Event))
-app.include_router(CRUDRouter(schema=Attendee))
-app.include_router(CRUDRouter(schema=Claim))
-app.include_router(CRUDRouter(schema=RequestMessage))
-app.include_router(CRUDRouter(schema=ResponseMessage))
+# app.include_router(CRUDRouter(schema=Event))
+# app.include_router(CRUDRouter(schema=Attendee))
+# app.include_router(CRUDRouter(schema=Claim))
+# app.include_router(CRUDRouter(schema=RequestMessage))
+# app.include_router(CRUDRouter(schema=ResponseMessage))
 app.state.database = database
 
 logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
@@ -168,6 +168,43 @@ async def upload_claims(request: Request, event_id: str, file: UploadFile = File
     }
 
 @app.get(
+    "/claims/{id}",
+    tags=['claims']
+)
+async def get_claim_by_id(request: Request, id: str):
+    return await Claim.objects.get_or_none(id=id)
+
+@app.put(
+    "/claims/{id}/clear_attendee",
+    tags=['claims']
+)
+async def clear_claim_attendee(request: Request, id: str):
+    try:
+        claim = await Claim.objects.get(pk=id)
+    except ormar.exceptions.NoMatch:
+        raise HTTPException(status_code=404, detail=f'Claim with id "{id}" does not exist')
+
+    async with request.app.state.database.transaction():
+        claim.remove(claim.attendee, 'attendee')
+        claim.reserved = False
+        await claim.update()
+
+@app.put(
+    "/claims/{id}/update_attendee",
+    tags=['claims']
+)
+async def update_claim_attendee(request: Request, id: str, username: str):
+    try:
+        claim = await Claim.objects.get(pk=id)
+    except ormar.exceptions.NoMatch:
+        raise HTTPException(status_code=404, detail=f'Claim with id "{id}" does not exist')
+
+    attendee = await Attendee.objects.get_or_create(username=username)
+    claim.attendee = attendee
+    claim.reserved = True
+    await claim.update()
+
+@app.get(
     "/scrape/get_usernames_by_submission",
     tags=['scrape']
 )
@@ -189,3 +226,67 @@ async def get_usernames_by_comment(request: Request, comment_id: str, traverse: 
         return list(set([c.author.name for c in comments if c.author]))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get(
+    "/export/events",
+    tags=['export']
+)
+async def export_events(request: Request):
+    events = await Event.objects.all()
+    data = [event.dict() for event in events]
+    stream = StringIO(pd.DataFrame(data).fillna('').to_csv(index=False))
+    response = StreamingResponse(stream, media_type="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename=events-{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}.csv"
+    return response
+
+@app.get(
+    "/export/attendees",
+    tags=['export']
+)
+async def export_attendees(request: Request):
+    attendees = await Attendee.objects.all()
+    data = [attendee.dict() for attendee in attendees]
+    stream = StringIO(pd.DataFrame(data).fillna('').to_csv(index=False))
+    response = StreamingResponse(stream, media_type="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename=attendees-{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}.csv"
+    return response
+
+@app.get(
+    "/export/claims",
+    tags=['export']
+)
+async def export_claims(request: Request):
+    claims = await Claim.objects.select_related('attendee').all()
+    data = []
+    for claim in claims:
+        data.append(dict(
+            id=claim.id,
+            event_id=claim.event.id,
+            reserved=claim.reserved,
+            link=claim.link,
+            attendee_username=claim.attendee.username if claim.attendee else ''
+        ))
+    stream = StringIO(pd.DataFrame(data).fillna('').to_csv(index=False))
+    response = StreamingResponse(stream, media_type="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename=claims-{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}.csv"
+    return response
+
+@app.get(
+    "/export/claims/{event_id}",
+    tags=['export']
+)
+async def export_claims_by_event(request: Request, event_id: str):
+    claims = await Claim.objects.select_related('attendee').filter(event__id__exact=event_id).all()
+    data = []
+    for claim in claims:
+        data.append(dict(
+            id=claim.id,
+            event_id=claim.event.id,
+            reserved=claim.reserved,
+            link=claim.link,
+            attendee_username=claim.attendee.username if claim.attendee else ''
+        ))
+    stream = StringIO(pd.DataFrame(data).fillna('').to_csv(index=False))
+    response = StreamingResponse(stream, media_type="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename={event_id}-claims-{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')}.csv"
+    return response
