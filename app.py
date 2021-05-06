@@ -22,7 +22,7 @@ API_SETTINGS = FastAPISettings.parse_obj(SETTINGS['fastapi'])
 from poapbot.store import EventDataStore
 from poapbot.scraper import RedditScraper
 from poapbot.bot import RedditBot
-from poapbot.models import metadata, database, Event, Attendee, Claim, RequestMessage, ResponseMessage
+from poapbot.models import metadata, database, Event, Attendee, Admin, Claim, RequestMessage, ResponseMessage
 
 engine = sqlalchemy.create_engine(DB_SETTINGS.url)
 metadata.create_all(engine)
@@ -72,6 +72,20 @@ async def shutdown():
         await db.disconnect()
 
 @app.post(
+    "/admin/create_admin",
+    description="Create Admin",
+    tags=['admin'],
+    response_model=Admin
+)
+async def create_admin(request: Request, username: str):
+    existing_admin = await Admin.objects.get_or_none(username__exact=username)
+    if existing_admin:
+        raise HTTPException(status_code=409, detail=f'Admin with username {username} already exists')
+    admin = Admin(username=username)
+    await admin.save()
+    return admin
+
+@app.post(
     "/admin/event",
     description="Create Event",
     tags=['admin'],
@@ -81,7 +95,8 @@ async def create_event(
     request: Request, 
     id: str, 
     name: str, 
-    code: str, 
+    code: str,
+    start_date: datetime,
     expiry_date: datetime, 
     description: Optional[str] = "",
     minimum_age: Optional[int] = 0,
@@ -94,8 +109,9 @@ async def create_event(
         event = Event(
             id=id, 
             name=name, 
-            code=code, 
-            description=description, 
+            code=code.lower(), 
+            description=description,
+            start_date=start_date,
             expiry_date=expiry_date,
             minimum_age=minimum_age,
             minimum_karma=minimum_karma

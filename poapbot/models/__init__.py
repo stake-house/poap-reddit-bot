@@ -18,5 +18,6 @@ class BaseMeta(ormar.ModelMeta):
 
 from .event import Event
 from .attendee import Attendee
+from .admin import Admin
 from .claim import Claim
 from .message import RequestMessage, ResponseMessage

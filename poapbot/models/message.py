@@ -27,4 +27,3 @@ class ResponseMessage(ormar.Model):
     username: str = ormar.String(max_length=100)
     created: datetime = ormar.DateTime()
     body: str = ormar.String(max_length=1024)
-    claim: Claim = ormar.ForeignKey(Claim, nullable=True, skip_reverse=True)

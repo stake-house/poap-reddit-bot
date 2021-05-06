@@ -22,3 +22,4 @@ class EventDataStore:
     async def create(self, cls: Model, *args, **kwargs):
         obj = cls(*args, **kwargs)
         await obj.save()
+        return obj
