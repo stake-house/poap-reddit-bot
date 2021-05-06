@@ -30,7 +30,7 @@ class RedditBot:
 
         request_message = await RequestMessage.objects.get_or_none(secondary_id=message.id)
         if request_message:
-            logger.debug(f'Request message {request_message.id} has already been processed, skipping')
+            logger.debug(f'Request message {request_message.secondary_id} has already been processed, skipping')
             await message.mark_read()
             return
         else:
@@ -46,16 +46,17 @@ class RedditBot:
         event = await Event.objects.get_or_none(code=code)
         if event:
             expired = event.expired()
-            claim = await Claim.objects.filter(ormar.and_(attendee__username__exact=username, event__id__exact=event.id)).get_or_none()
+            claim = await Claim.objects.filter(attendee__username=username, event__id__exact=event.id).get_or_none()
             if claim:
                 comment = await message.reply(f'Your claim link for {claim.event.name} is {claim.link}')
                 logger.debug(f'Received valid request from {username} for event {event.id}, sending link {claim.link}')
             elif not expired:
-                claim = await Claim.objects.filter(ormar.and_(attendee__id__isnull=True, reserved__exact=False, event__id__exact=event.id)).get_or_none()
+                claim = await Claim.objects.filter(reserved__exact=False, event__id__exact=event.id).limit(1).all()
+                if claim:
+                    claim = claim[0]
                 if claim:
                     async with database.transaction():
                         attendee = await Attendee.objects.get_or_create(username=username)
-                        await event.attendees.add(attendee)
                         claim.attendee = attendee
                         claim.reserved = True
                         await claim.update()

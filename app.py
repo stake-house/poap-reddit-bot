@@ -114,6 +114,8 @@ async def upload_claims(request: Request, event_id: str, file: UploadFile = File
 
     success = 0
     rejected = []
+    create_attendees = []
+    create_claims = []
     for index, row in df.iterrows():
         if row.username in existing_usernames:
             rejected.append({'index':index, 'reason':f'Username {row.username} already has reserved claim'})
@@ -124,18 +126,25 @@ async def upload_claims(request: Request, event_id: str, file: UploadFile = File
         elif not row.link:
             rejected.append({'index':index, 'reason':f'Invalid link {row.link}'})
         
-        attendee = await Attendee.objects.get_or_create(username=row.username) if row.username else None
-        claim = Claim(attendee=attendee, event=event, link=row.link, reserved=True if attendee else False)
+        if row.username:
+            attendee = await Attendee.objects.get_or_none(username=row.username)
+            if not attendee:
+                attendee = Attendee(username=row.username)
+                create_attendees.append(attendee)
+        else:
+            attendee = None
 
-        async with request.app.state.database.transaction():
-            if attendee:
-                await attendee.upsert()
-            await claim.save()
+        claim = Claim(attendee=attendee, event=event, link=row.link, reserved=True if attendee else False)
+        create_claims.append(claim)
         success += 1
+
+    async with request.app.state.database.transaction():
+        await Attendee.objects.bulk_create(create_attendees)
+        await Claim.objects.bulk_create(create_claims)
     
     return {
         'success': success,
-        'rejected': rejected
+        'rejected': rejected if (len(rejected) <= 100) else len(rejected)
     }
 
 @app.get(
