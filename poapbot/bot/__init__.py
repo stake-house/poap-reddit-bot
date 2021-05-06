@@ -5,24 +5,26 @@ from datetime import datetime
 import logging
 import ormar
 
-from ..models import database, Event, Claim, Attendee, RequestMessage, ResponseMessage
+from ..models import Event, Claim, Attendee, RequestMessage, ResponseMessage
+from ..store import EventDataStore
 from .exceptions import ExpiredEvent, NoClaimsAvailable, InvalidCode, InsufficientAccountAge, InsufficientKarma
 
 logger = logging.getLogger(__name__)
 
 class RedditBot:
 
-    def __init__(self, client: Reddit):
+    def __init__(self, client: Reddit, store: EventDataStore):
         self.client = client
+        self.store = store
 
     async def reserve_claim(self, code: str, redditor: Redditor) -> Claim:
-        event = await Event.objects.get_or_none(code=code)
+        event = await self.store.get(Event, code=code)
         if not event:
             raise InvalidCode
         elif event.expired():
             raise ExpiredEvent(event)
 
-        existing_claim = await Claim.objects.filter(attendee__username=redditor.name, event__id__exact=event.id).get_or_none()
+        existing_claim = await self.store.get_filter(Claim, attendee__username=redditor.name, event__id__exact=event.id)
         if existing_claim:
             return existing_claim
 
@@ -33,12 +35,12 @@ class RedditBot:
         elif age < event.minimum_age:
             raise InsufficientAccountAge(event)
 
-        async with database.transaction():
+        async with self.store.db.transaction():
             try:
-                claim = await Claim.objects.filter(reserved__exact=False, event__id__exact=event.id).first()
+                claim = await self.store.get_filter_first(Claim, reserved__exact=False, event__id__exact=event.id)
             except ormar.exceptions.NoMatch:
                 raise NoClaimsAvailable(event)
-            attendee = await Attendee.objects.get_or_create(username=redditor.name)
+            attendee = await self.store.get_or_create(Attendee, username=redditor.name)
             claim.attendee = attendee
             claim.reserved = True
             await claim.update()
@@ -63,20 +65,20 @@ class RedditBot:
             logger.info('Received message from reddit, skipping')
             return
 
-        request_message = await RequestMessage.objects.get_or_none(secondary_id=message.id)
+        request_message = await self.store.get(RequestMessage, secondary_id=message.id)
         if request_message:
             logger.debug(f'Request message {request_message.secondary_id} has already been processed, skipping')
             await message.mark_read()
             return
 
-        request_message = RequestMessage(
+        request_message = await self.store.create(
+            RequestMessage, 
             secondary_id=message.id, 
             username=redditor.name, 
             created=message.created_utc, 
             subject=message.subject, 
             body=message.body
         )
-        await request_message.save()
 
         claim = None
         try:
@@ -100,8 +102,14 @@ class RedditBot:
             logger.debug(f'Received request from {redditor.name} for event {e.event.id}, but not enough karma')
 
         await message.mark_read()
-        response_message = ResponseMessage(secondary_id=comment.id, username=comment.author.name, created=comment.created_utc, body=comment.body, claim=claim)
-        await response_message.save()
+        await self.store.create(
+            ResponseMessage,
+            secondary_id=comment.id, 
+            username=comment.author.name, 
+            created=comment.created_utc, 
+            body=comment.body, 
+            claim=claim
+        )
 
     async def run(self):
         while True:

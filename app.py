@@ -19,6 +19,7 @@ REDDIT_SETTINGS = RedditSettings.parse_obj(SETTINGS['reddit'])
 DB_SETTINGS = DBSettings.parse_obj(SETTINGS['db'])
 API_SETTINGS = FastAPISettings.parse_obj(SETTINGS['fastapi'])
 
+from poapbot.store import EventDataStore
 from poapbot.scraper import RedditScraper
 from poapbot.bot import RedditBot
 from poapbot.models import metadata, database, Event, Attendee, Claim, RequestMessage, ResponseMessage
@@ -47,6 +48,9 @@ async def startup_event():
     if not db.is_connected:
         await db.connect()
 
+    store = EventDataStore(db)
+    app.state.store = store
+
     reddit_client = asyncpraw.Reddit(
         username=REDDIT_SETTINGS.auth.username,
         password=REDDIT_SETTINGS.auth.password.get_secret_value(),
@@ -55,7 +59,7 @@ async def startup_event():
         user_agent=REDDIT_SETTINGS.auth.user_agent
     )
     
-    bot = RedditBot(reddit_client)
+    bot = RedditBot(reddit_client, store)
     asyncio.create_task(bot.run())
 
     app.state.scraper = RedditScraper(reddit_client)
