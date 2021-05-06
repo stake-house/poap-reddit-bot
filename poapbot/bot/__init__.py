@@ -29,9 +29,9 @@ class RedditBot:
         await redditor.load()
         age = (datetime.utcnow() - datetime.utcfromtimestamp(int(redditor.created_utc))).total_seconds() // 86400 # seconds in a day
         if redditor.comment_karma + redditor.link_karma < event.minimum_karma:
-            raise InsufficientKarma(redditor)
+            raise InsufficientKarma(event)
         elif age < event.minimum_age:
-            raise InsufficientAccountAge(redditor)
+            raise InsufficientAccountAge(event)
 
         async with database.transaction():
             try:
