@@ -6,6 +6,7 @@ import logging
 import ormar
 
 from ..models import database, Event, Claim, Attendee, RequestMessage, ResponseMessage
+from .exceptions import ExpiredEvent, NoClaimsAvailable, InvalidCode
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,28 @@ class RedditBot:
 
     def __init__(self, client: Reddit):
         self.client = client
+
+    async def reserve_claim(self, code: str, username: str) -> Claim:
+        event = await Event.objects.get_or_none(code=code)
+        if not event:
+            raise InvalidCode
+        elif event.expired():
+            raise ExpiredEvent(event)
+
+        existing_claim = await Claim.objects.filter(attendee__username=username, event__id__exact=event.id).get_or_none()
+        if existing_claim:
+            return existing_claim
+
+        async with database.transaction():
+            try:
+                claim = await Claim.objects.filter(reserved__exact=False, event__id__exact=event.id).first()
+            except ormar.exceptions.NoMatch:
+                raise NoClaimsAvailable(event)
+            attendee = await Attendee.objects.get_or_create(username=username)
+            claim.attendee = attendee
+            claim.reserved = True
+            await claim.update()
+        return claim
 
     async def message_handler(self, message: Message):
         username = message.author.name if message.author else None
@@ -43,37 +66,20 @@ class RedditBot:
             )
             await request_message.save()
 
-        event = await Event.objects.get_or_none(code=code)
-        if event:
-            expired = event.expired()
-            claim = await Claim.objects.filter(attendee__username=username, event__id__exact=event.id).get_or_none()
-            if claim:
-                comment = await message.reply(f'Your claim link for {claim.event.name} is {claim.link}')
-                logger.debug(f'Received valid request from {username} for event {event.id}, sending link {claim.link}')
-            elif not expired:
-                claim = await Claim.objects.filter(reserved__exact=False, event__id__exact=event.id).limit(1).all()
-                if claim:
-                    claim = claim[0]
-                if claim:
-                    async with database.transaction():
-                        attendee = await Attendee.objects.get_or_create(username=username)
-                        claim.attendee = attendee
-                        claim.reserved = True
-                        await claim.update()
-                    comment = await message.reply(f'Your claim link for {claim.event.name} is {claim.link}')
-                    logger.debug(f'Received request from {username} for event {event.id}, reserved claim and sent link')
-                else:
-                    comment = await message.reply(f'Sorry, there are no more claims available for {event.name}')
-                    logger.debug(f'Received request from {username} for event {event.id}, but no more claims are available')
-            elif expired:
-                comment = await message.reply(f'Sorry, event {event.name} has expired')
-                logger.debug(f'Received request from {username} for event {event.id}, but event has expired')
-            else:
-                comment = await message.reply(f'Sorry, there are no more claims available for {event.name}')
-                logger.debug(f'Received request from {username} for event {event.id}, but no more claims are available')
-        else:
+        claim = None
+        try:
+            claim = await self.reserve_claim(code, username)
+            comment = await message.reply(f'Your claim link for {claim.event.name} is {claim.link}')
+            logger.debug(f'Received valid request from {username} for event {claim.event.id}, sending link {claim.link}')
+        except InvalidCode:
             comment = await message.reply(f'Invalid event code: {code}')
             logger.debug(f'Received request from {username} with invalid code {code}')
+        except ExpiredEvent as e:
+            comment = await message.reply(f'Sorry, event {e.event.name} has expired')
+            logger.debug(f'Received request from {username} for event {e.event.id}, but event has expired')
+        except NoClaimsAvailable as e:
+            comment = await message.reply(f'Sorry, there are no more claims available for {e.event.name}')
+            logger.debug(f'Received request from {username} for event {e.event.id}, but no more claims are available')
 
         await message.mark_read()
         response_message = ResponseMessage(secondary_id=comment.id, username=comment.author.name, created=comment.created_utc, body=comment.body, claim=claim)

@@ -1,6 +1,5 @@
 import asyncpraw
 import asyncio
-from .exceptions import *
 
 class RedditScraper:
 
