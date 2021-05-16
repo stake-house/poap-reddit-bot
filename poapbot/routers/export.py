@@ -60,3 +60,4 @@ async def export_claims_by_event(event_id: str, db: POAPDatabase = Depends(get_d
             username=claim.attendee.username if claim.attendee else ''
         ))
     return data_to_csv_response(data, f'claims-{event_id}')
+    

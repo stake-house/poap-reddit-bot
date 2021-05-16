@@ -28,3 +28,4 @@ async def get_usernames_by_comment(comment_id: str, traverse: bool = False, scra
         return list(set([c.author.name for c in comments if c.author]))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+        

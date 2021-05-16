@@ -23,3 +23,4 @@ async def create_admin(admin: AdminCreate, db: POAPDatabase = Depends(get_db)):
         return await db.create_admin(admin)
     except ConflictError as e:
         raise HTTPException(status_code=409, detail=str(e))
+        

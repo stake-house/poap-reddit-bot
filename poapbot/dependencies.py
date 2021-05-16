@@ -7,3 +7,4 @@ async def get_db(request: Request) -> POAPDatabase:
 
 async def get_scraper(request: Request) -> RedditScraper:
     return request.app.state.scraper
+    
