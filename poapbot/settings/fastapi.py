@@ -8,4 +8,3 @@ class FastAPISettings(BaseSettings):
 
     class Config:
         env_prefix = 'fastapi_'
-        

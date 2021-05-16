@@ -16,4 +16,3 @@ class POAPSettings(BaseSettings):
                 file_secret_settings: SettingsSourceCallable,
             ) -> Tuple[SettingsSourceCallable, ...]:
             return env_settings, init_settings, file_secret_settings
-            

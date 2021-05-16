@@ -23,4 +23,3 @@ class AuthSettings(BaseSettings):
 
 class RedditSettings(BaseSettings):
     auth: AuthSettings
-    

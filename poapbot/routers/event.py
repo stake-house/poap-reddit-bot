@@ -41,4 +41,3 @@ async def delete_event(id: str, db: POAPDatabase = Depends(get_db)):
         return await db.delete_event_by_id(id)
     except DoesNotExist as e:
         raise HTTPException(status_code=404, detail=str(e))
-        

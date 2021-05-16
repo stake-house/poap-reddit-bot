@@ -10,4 +10,3 @@ class BulkError(Exception):
     """Raised when an error in encountered while processing bulk insert"""
     def __init__(self, errors: List[Dict[Union[int,str], str]]):
         self.errors = errors
-        

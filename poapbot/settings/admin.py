@@ -13,4 +13,3 @@ class Admin(ormar.Model):
 
     id: str = ormar.Integer(primary_key=True)
     username: str = ormar.String(max_length=100)
-    

@@ -30,4 +30,3 @@ class RedditScraper:
             if traverse:
                 comments = await comments.list()
             return comments
-            

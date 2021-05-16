@@ -174,4 +174,3 @@ class RedditBot:
             except:
                 logger.error('Encountered error in run loop', exc_info=True)
             await asyncio.sleep(1)
-            

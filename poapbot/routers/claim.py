@@ -108,4 +108,3 @@ async def set_claim_by_event_id(event_id: str, username: str, db: POAPDatabase =
         raise HTTPException(status_code=404, detail=str(e))
     except ConflictError as e:
         raise HTTPException(status_code=409, detail=str(e))
-        

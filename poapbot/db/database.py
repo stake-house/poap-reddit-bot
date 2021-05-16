@@ -288,4 +288,3 @@ class POAPDatabase:
             await Claim.objects.bulk_create(claims)
 
         return claims
-        
