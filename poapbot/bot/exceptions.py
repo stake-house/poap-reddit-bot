@@ -1,4 +1,4 @@
-from ..models import Event
+from poapbot.db.models import Event
 from asyncpraw.models import Redditor
 
 class NotStartedEvent(Exception):

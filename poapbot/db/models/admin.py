@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 import ormar
 from datetime import datetime
 from typing import List, Optional
@@ -10,5 +11,9 @@ class Admin(ormar.Model):
         tablename = "admins"
         constraints = [ormar.UniqueColumns('username')]
 
-    id: str = ormar.Integer(primary_key=True)
+    id: int = ormar.Integer(primary_key=True)
     username: str = ormar.String(max_length=100)
+
+class AdminCreate(BaseModel):
+
+    username: str

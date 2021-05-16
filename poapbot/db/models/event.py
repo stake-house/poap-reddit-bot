@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 import ormar
 from pydantic import BaseModel
 from datetime import datetime
@@ -25,3 +26,27 @@ class Event(ormar.Model):
 
     def started(self):
         return self.start_date < datetime.utcnow()
+
+class EventCreate(BaseModel):
+
+    id: str
+    name: str
+    description: str = ""
+    code: str
+    start_date: datetime
+    expiry_date: datetime
+
+    minimum_karma: int = 0
+    minimum_age: int = 0
+
+class EventUpdate(BaseModel):
+
+    id: str
+    name: Optional[str] = None
+    description: Optional[str] = None
+    code: Optional[str] = None
+    start_date: Optional[datetime] = None
+    expiry_date: Optional[datetime] = None
+
+    minimum_karma: Optional[int] = None
+    minimum_age: Optional[int] = None
