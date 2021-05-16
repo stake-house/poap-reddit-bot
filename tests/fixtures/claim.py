@@ -1,5 +1,5 @@
 import pytest
-from poapbot.models import Claim
+from poapbot.db.models import Claim
 
 @pytest.fixture
 def dummy_claim(dummy_event):

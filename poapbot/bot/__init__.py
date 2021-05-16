@@ -5,33 +5,42 @@ from datetime import datetime
 import logging
 import ormar
 import re
+import yaml
 
-from ..models import Event, Claim, Attendee, Admin, RequestMessage, ResponseMessage
-from ..store import EventDataStore
+from poapbot.db.models import Event, Claim, Attendee, Admin, RequestMessage, ResponseMessage
+from poapbot.settings import POAPSettings
+from poapbot.db import POAPDatabase, DoesNotExist
+
 from .exceptions import NotStartedEvent, ExpiredEvent, NoClaimsAvailable, InvalidCode, InsufficientAccountAge, InsufficientKarma, UnauthorizedCommand
 
 logger = logging.getLogger(__name__)
 
+SETTINGS = POAPSettings.parse_obj(yaml.safe_load(open('settings.yaml','r'))['poap'])
+
 CREATE_EVENT_PATTERN = re.compile(r'create_event (?P<id>\w+) (?P<name>\w+) (?P<code>\w+) (?P<start_date>[\w:-]+) (?P<expiry_date>[\w:-]+) (?P<minimum_age>\w+) (?P<minimum_karma>\w+)')
+ADD_CLAIMS_PATTERN = re.compile(r'add_claims (?P<event_id>\w+) (?P<codes>(\w+,?)+)')
 
 class RedditBot:
 
-    def __init__(self, client: Reddit, store: EventDataStore):
+    def __init__(self, client: Reddit, db: POAPDatabase):
         self.client = client
-        self.store = store
+        self.db = db
 
     async def reserve_claim(self, code: str, redditor: Redditor) -> Claim:
-        event = await self.store.get(Event, code=code)
-        if not event:
+        try:
+            event = await self.db.get_event_by_code(code)
+        except DoesNotExist:
             raise InvalidCode
-        elif not event.started():
+
+        try:
+            return await self.db.get_claim_by_event_username(event.id, redditor.name)
+        except DoesNotExist:
+            pass
+
+        if not event.started():
             raise NotStartedEvent(event)
         elif event.expired():
             raise ExpiredEvent(event)
-
-        existing_claim = await self.store.get_filter(Claim, attendee__username=redditor.name, event__id__exact=event.id)
-        if existing_claim:
-            return existing_claim
 
         await redditor.load()
         age = (datetime.utcnow() - datetime.utcfromtimestamp(int(redditor.created_utc))).total_seconds() // 86400 # seconds in a day
@@ -40,16 +49,10 @@ class RedditBot:
         elif age < event.minimum_age:
             raise InsufficientAccountAge(event)
 
-        async with self.store.db.transaction():
-            try:
-                claim = await self.store.get_filter_first(Claim, reserved__exact=False, event__id__exact=event.id)
-            except ormar.exceptions.NoMatch:
-                raise NoClaimsAvailable(event)
-            attendee = await self.store.get_or_create(Attendee, username=redditor.name)
-            claim.attendee = attendee
-            claim.reserved = True
-            await claim.update()
-        return claim
+        try:
+            return await self.db.set_claim_by_event_id(event.id, redditor.name)
+        except DoesNotExist:
+            raise NoClaimsAvailable(event)
 
     async def try_claim(self, code: str, message: Message, redditor: Redditor) -> Comment:
         claim = None
@@ -80,7 +83,10 @@ class RedditBot:
             return await message.reply(f'Bot encountered an unrecognized error :(')
 
     async def is_admin(self, redditor: Redditor):
-        return await self.store.get(Admin, username__exact=redditor.name) is not None
+        try:
+            return await self.db.get_admin_by_username(redditor.name) is not None
+        except DoesNotExist:
+            return False
     
     async def create_event(self, message: Message, redditor: Redditor) -> Comment:
         if not await self.is_admin(redditor):
@@ -98,13 +104,13 @@ class RedditBot:
         else:
             command_data = command_data.groupdict()
 
-        existing_event = await self.store.get(Event, pk=command_data['id'])
+        existing_event = await self.db.get_event_by_id(command_data['id'])
         if existing_event:
             logger.debug(f'Received request to create event, but an event with the provided id already exists')
             return await message.reply(f'Failed to create event: An event with id {command_data["id"]} already exists')
 
         try:
-            event = await self.store.create(Event, **command_data)
+            event = await self.db.create_event(**command_data)
             logger.debug('Received request to create event, successful')
             return await message.reply(f'Successfully created event {event.name}')
         except Exception as e:
@@ -130,19 +136,18 @@ class RedditBot:
             logger.info('Received message from reddit, skipping')
             return
 
-        request_message = await self.store.get(RequestMessage, secondary_id=message.id)
+        request_message = await self.db.get(RequestMessage, secondary_id=message.id)
         if request_message:
             logger.debug(f'Request message {request_message.secondary_id} has already been processed, skipping')
             await message.mark_read()
             return
 
-        request_message = await self.store.create(
-            RequestMessage, 
-            secondary_id=message.id, 
-            username=redditor.name, 
-            created=message.created_utc, 
-            subject=message.subject, 
-            body=message.body
+        await self.db.create_request_message(
+            message.id,
+            redditor.name,
+            message.created_utc,
+            message.subject,
+            message.body
         )
 
         if code == 'create_event':
@@ -151,12 +156,11 @@ class RedditBot:
             comment = await self.try_claim(code, message, redditor)
 
         await message.mark_read()
-        await self.store.create(
-            ResponseMessage,
-            secondary_id=comment.id, 
-            username=comment.author.name, 
-            created=comment.created_utc, 
-            body=comment.body
+        await self.db.create_response_message(
+            comment.id, 
+            comment.author.name, 
+            comment.created_utc, 
+            comment.body
         )
 
     async def run(self):

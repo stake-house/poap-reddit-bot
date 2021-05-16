@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 import ormar
 from datetime import datetime
 from typing import List, Optional
@@ -17,3 +18,9 @@ class Claim(ormar.Model):
     event: Event = ormar.ForeignKey(Event, skip_reverse=True)
     link: str = ormar.String(max_length=256)
     reserved: Optional[bool] = ormar.Boolean(default=False)
+
+class ClaimCreate(BaseModel):
+
+    username: str = None
+    event_id: str
+    link: str

@@ -1,5 +1,5 @@
 import pytest
-from poapbot.models import Attendee
+from poapbot.db.models import Attendee
 from datetime import datetime
 
 @pytest.fixture

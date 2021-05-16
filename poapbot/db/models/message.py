@@ -1,9 +1,9 @@
+from pydantic import BaseModel
 import ormar
 from datetime import datetime
 from typing import List, Optional
 
 from . import BaseMeta
-from .claim import Claim
 
 class RequestMessage(ormar.Model):
 
@@ -27,3 +27,18 @@ class ResponseMessage(ormar.Model):
     username: str = ormar.String(max_length=100)
     created: datetime = ormar.DateTime()
     body: str = ormar.String(max_length=1024)
+
+class RequestMessageCreate(BaseModel):
+
+    secondary_id: str
+    username: str
+    created: datetime
+    subject: str
+    body: str
+
+class ResponseMessageCreate(BaseModel):
+
+    secondary_id: str
+    username: str
+    created: datetime
+    body: str

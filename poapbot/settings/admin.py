@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from . import BaseMeta
+from .event import Event
 
 class Admin(ormar.Model):
     
