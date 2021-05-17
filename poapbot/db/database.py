@@ -107,7 +107,7 @@ class POAPDatabase:
 
     async def get_claims_by_event_id(self, event_id: str, select_related: List[str] = None, offset: int = 0, limit: int = 0) -> List[Claim]:
         try:
-            q = Claim.objects.filter(event__code__id=event_id).offset(offset)
+            q = Claim.objects.filter(event__id=event_id).offset(offset)
             if select_related:
                 q = q.select_related(select_related)
             if limit > 0:

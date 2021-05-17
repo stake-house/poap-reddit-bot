@@ -1,30 +1,34 @@
+from poapbot.db.exceptions import ConflictError
 from asyncpraw import Reddit
 from asyncpraw.models import Message, Redditor, Comment
 import asyncio
 from datetime import datetime
 import logging
-import ormar
-import re
 import yaml
+from typing import Dict, List
 
-from poapbot.db.models import Event, Claim, Attendee, Admin, RequestMessage, ResponseMessage
+from poapbot.db.models import *
 from poapbot.settings import POAPSettings
 from poapbot.db import POAPDatabase, DoesNotExist
 
 from .exceptions import NotStartedEvent, ExpiredEvent, NoClaimsAvailable, InvalidCode, InsufficientAccountAge, InsufficientKarma, UnauthorizedCommand
+from .commands import *
 
 logger = logging.getLogger(__name__)
 
 SETTINGS = POAPSettings.parse_obj(yaml.safe_load(open('settings.yaml','r'))['poap'])
-
-CREATE_EVENT_PATTERN = re.compile(r'create_event (?P<id>\w+) (?P<name>\w+) (?P<code>\w+) (?P<start_date>[\w:-]+) (?P<expiry_date>[\w:-]+) (?P<minimum_age>\w+) (?P<minimum_karma>\w+)')
-ADD_CLAIMS_PATTERN = re.compile(r'add_claims (?P<event_id>\w+) (?P<codes>(\w+,?)+)')
 
 class RedditBot:
 
     def __init__(self, client: Reddit, db: POAPDatabase):
         self.client = client
         self.db = db
+
+        self.command_handlers = {
+            CreateEventCommand: self.create_event,
+            UpdateEventCommand: self.update_event,
+            CreateClaimsCommand: self.create_claims
+        }
 
     async def reserve_claim(self, code: str, redditor: Redditor) -> Claim:
         try:
@@ -54,33 +58,33 @@ class RedditBot:
         except DoesNotExist:
             raise NoClaimsAvailable(event)
 
-    async def try_claim(self, code: str, message: Message, redditor: Redditor) -> Comment:
+    async def try_claim(self, code: str, message: Message, redditor: Redditor):
         claim = None
         try:
             claim = await self.reserve_claim(code, redditor)
             logger.debug(f'Received valid request from {redditor.name} for event {claim.event.id}, sending link {claim.link}')
-            return await message.reply(f'Your claim link for {claim.event.name} is {claim.link}')
+            await self.send_response(message, f'Your claim link for {claim.event.name} is {claim.link}')
         except InvalidCode:
             logger.debug(f'Received request from {redditor.name} with invalid code {code}')
-            return await message.reply(f'Invalid event code: {code}')
+            await self.send_response(message, f'Invalid event code: {code}')
         except NotStartedEvent as e:
             logger.debug(f'Received request from {redditor.name} for event {e.event.id}, but event has not started')
-            return await message.reply(f'Sorry, event {e.event.name} has not started yet')
+            await self.send_response(message, f'Sorry, event {e.event.name} has not started yet')
         except ExpiredEvent as e:
             logger.debug(f'Received request from {redditor.name} for event {e.event.id}, but event has expired')
-            return await message.reply(f'Sorry, event {e.event.name} has expired')
+            await self.send_response(message, f'Sorry, event {e.event.name} has expired')
         except NoClaimsAvailable as e:
             logger.debug(f'Received request from {redditor.name} for event {e.event.id}, but no more claims are available')
-            return await message.reply(f'Sorry, there are no more claims available for {e.event.name}')
+            await self.send_response(message, f'Sorry, there are no more claims available for {e.event.name}')
         except InsufficientAccountAge as e:
             logger.debug(f'Received request from {redditor.name} for event {e.event.id}, but account is too young')
-            return await message.reply(f'Sorry, your account is not old enough to be eligible')
+            await self.send_response(message, f'Sorry, your account is not old enough to be eligible')
         except InsufficientKarma as e:
             logger.debug(f'Received request from {redditor.name} for event {e.event.id}, but not enough karma')
-            return await message.reply(f'Sorry, your account does not have enough karma to be eligible')
+            await self.send_response(message, f'Sorry, your account does not have enough karma to be eligible')
         except Exception as e:
             logger.error(e, exc_info=True)
-            return await message.reply(f'Bot encountered an unrecognized error :(')
+            await self.send_response(message, f'Bot encountered an unrecognized error :(')
 
     async def is_admin(self, redditor: Redditor):
         try:
@@ -88,35 +92,51 @@ class RedditBot:
         except DoesNotExist:
             return False
     
-    async def create_event(self, message: Message, redditor: Redditor) -> Comment:
-        if not await self.is_admin(redditor):
-            logger.debug(f'Received request from {redditor.name} to create_event, but they are unauthorized')
-            return await message.reply('You are unauthorized to execute this command')
-
-        command_data = CREATE_EVENT_PATTERN.match(message.body)
-        if not command_data:
-            logger.debug(f'Received request from {redditor.name} to create_event, but command was malformed: {message.body}')
-            return await message.reply(
-                """Your create_event command was malformed, must be of the format: \n\n"""
-                """'create_event event_id event_name event_code start_date end_date minimum_age minimum_karma'\n\n"""
-                """Date strings must be in UTC and ISO8601 formatted, eg. 2021-05-01T00:00:00"""
-            )
-        else:
-            command_data = command_data.groupdict()
-
-        existing_event = await self.db.get_event_by_id(command_data['id'])
-        if existing_event:
-            logger.debug(f'Received request to create event, but an event with the provided id already exists')
-            return await message.reply(f'Failed to create event: An event with id {command_data["id"]} already exists')
-
+    async def create_event(self, message: Message, command_data: Dict[str, str]):
         try:
-            event = await self.db.create_event(**command_data)
-            logger.debug('Received request to create event, successful')
-            return await message.reply(f'Successfully created event {event.name}')
+            event = await self.db.create_event(EventCreate(**command_data))
+            await self.send_response(message, f'Successfully created event: {event.json()}')
         except Exception as e:
-            logger.error(f'Received request to create event, but it failed: {e}', exc_info=True)
-            return await message.reply(f'Failed to create event: {e}')
+            await self.send_response(message, f'Failed to create event: {e}')
 
+    async def update_event(self, message: Message, command_data: Dict[str, str]):
+        try:
+            event = await self.db.update_event(EventUpdate(**command_data))
+            await self.send_response(message, f'Successfully updated event: {event.json()}')
+        except Exception as e:
+            await self.send_response(message, f'Failed to update event: {e}')
+
+    async def create_claims(self, message: Message, command_data: Dict[str, str]):
+        try:
+            event_id = command_data['event_id']
+            event = await self.db.get_event_by_id(event_id)
+            new_claims = [ClaimCreate(event_id=event_id, link=f'{SETTINGS.url}{code}') for code in command_data['codes'].split(',')]
+            claims = await self.db.create_claims_bulk(event_id, new_claims)
+            await self.send_response(message, f'Successfully added {len(claims)} claims to event {event.name}')
+        except Exception:
+            logger.error(f'Failed to add claims', exc_info=True)
+            await self.send_response(message, 'Failed to add claims')
+
+    async def process_command(self, message: Message, command: Command):
+        command_data = command.pattern.match(message.body)
+        if not command_data:
+            logger.debug(f'Received {command.name} command, but was malformed: {message.body}')
+            await self.send_response(message, f'{command.name} command was malformed, must be of the format: \n\n{command.example}')
+        else:
+            try:
+                await self.command_handlers[command](message, command_data.groupdict())
+            except:
+                logger.error('Failed to parse command', exc_info=True)
+
+    async def send_response(self, message: Message, response: str):
+        response_message = await message.reply(response)
+        await self.db.create_response_message(
+            response_message.id, 
+            response_message.author.name, 
+            response_message.created_utc, 
+            response_message.body
+        )
+    
     async def message_handler(self, message: Message):
         redditor = message.author
         if not redditor:
@@ -124,10 +144,8 @@ class RedditBot:
             await message.mark_read()
             return
 
-        code = message.body.split(' ')[0].lower()
-
-        if code == 'ping':
-            await message.reply('pong')
+        if message.body.lower() == 'ping':
+            await self.send_response(message, 'pong')
             await message.mark_read()
             logger.info('Received ping, sending pong')
             return
@@ -136,11 +154,14 @@ class RedditBot:
             logger.info('Received message from reddit, skipping')
             return
 
-        request_message = await self.db.get(RequestMessage, secondary_id=message.id)
-        if request_message:
-            logger.debug(f'Request message {request_message.secondary_id} has already been processed, skipping')
-            await message.mark_read()
-            return
+        try:
+            request_message = await self.db.get_request_message_by_id(message.id)
+            if request_message:
+                logger.debug(f'Request message {request_message.secondary_id} has already been processed, skipping')
+                await message.mark_read()
+                return
+        except DoesNotExist:
+            pass
 
         await self.db.create_request_message(
             message.id,
@@ -150,18 +171,18 @@ class RedditBot:
             message.body
         )
 
-        if code == 'create_event':
-            comment = await self.create_event(message, redditor)
+        code = message.body.split(' ')[0].lower()
+        command = next(filter(lambda cmd: cmd.name == code, self.command_handlers.keys()), None)
+        if command:
+            if not await self.is_admin(redditor):
+                logger.debug(f'Received request from {redditor.name} to {command.name}, but they are unauthorized')
+                await self.send_response(message, 'You are unauthorized to execute command: {command.name}')
+            else:
+                await self.process_command(message, command)
         else:
-            comment = await self.try_claim(code, message, redditor)
+            await self.try_claim(code, message, redditor)
 
         await message.mark_read()
-        await self.db.create_response_message(
-            comment.id, 
-            comment.author.name, 
-            comment.created_utc, 
-            comment.body
-        )
 
     async def run(self):
         while True:

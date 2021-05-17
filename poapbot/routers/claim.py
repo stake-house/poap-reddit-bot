@@ -1,7 +1,7 @@
 from poapbot.db.models.claim import ClaimCreate
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 import pandas as pd
 from io import StringIO
 from poapbot.db import POAPDatabase, DoesNotExist, ConflictError, BulkError
@@ -52,6 +52,17 @@ async def upload_claims(event_id: str, file: UploadFile = File(...), db: POAPDat
 async def get_claim_by_id(id: str, db: POAPDatabase = Depends(get_db)):
     try:
         return await db.get_claim_by_id(id)
+    except DoesNotExist as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get(
+    "/event/{event_id}",
+    tags=['claims'],
+    response_model=List[Claim]
+)
+async def get_claims_by_event_id(event_id: str, db: POAPDatabase = Depends(get_db)):
+    try:
+        return await db.get_claims_by_event_id(event_id)
     except DoesNotExist as e:
         raise HTTPException(status_code=404, detail=str(e))
 

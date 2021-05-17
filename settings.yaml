@@ -9,6 +9,9 @@ reddit:
 db:
   url: sqlite:///test.db
 
+poap:
+  url: https://poap.xyz/claim/
+
 fastapi:
   title: Reddit POAP Bot
   version: 0.1.0
