@@ -1,11 +1,11 @@
 pydantic==1.8
 fastapi==0.63.0
-databases
-uvicorn[standard]
+databases==0.4.1
+uvicorn[standard]==0.13.4
 asyncpraw==7.2.0
 pyyaml==5.4.1
 fastapi-crudrouter==0.7.1
 ormar[sqlite]==0.10.5
 python-multipart==0.0.5
-pandas
-colorlog
+pandas==1.2.4
+colorlog==5.0.1
