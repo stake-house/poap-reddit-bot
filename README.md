@@ -18,7 +18,23 @@
 
 # Usage
 ## Attendees
-todo
+Once you've created and configured your event with the bot, all you need to do is distribute the secret code to attendees. Let them know that they just need to private message the bot with the code and it will give them their claim link. Below is a template you can use which includes a link they can click to initiate the message automatically!
+
+> This message contains a link to claim the POAP for <YOUR EVENT NAME\>. POAP is the Proof of Attendance Protocol, a platform that issues ERC-721 tokens on the xDai platform to show that you were present at an event.
+>
+> To claim the POAP for this event, [click on this link and submit the message](https://www.reddit.com/message/compose?to=<YOUR REDDIT BOT\>&subject=claim&message=<EVENT CODE\>). In a few minutes, you will receive a response from the bot that includes your claim link (or an error message).
+>
+> There are some important caveats to consider:
+>
+> \* No one should EVER ask for your private key or seed phrase. Guard these items with all of your might. When you receive a POAP claim link, you will be prompted to enter your wallet address, this wallet address is public.
+>
+> \* We highly suggest that you use an unfunded Ethereum wallet to claim POAPs. It's not good practice to link your POAP badges to your assets.
+>
+> \* Collecting POAPs is cool, but when you have enough, the wallet can easily be linked to you. This is GOOD and fun, but you don't want to dox your assets.
+>
+> \* POAPs tools do not interface well with hardware wallets, we recommend using a native metamask wallet for easy POAP management.
+> 
+> \* Your reddit account must be <YOUR EVENT ACCOUNT AGE MINIMUM\> and have <YOUR EVENT KARMA MINUMUM\> karma to claim this badge.
 
 ## Admin via Reddit
 Administration of the bot can be performed using commands issued via Reddit private messages (not the newer reddit chat feature). The permission model for this is currently rudimentary. It consists of only a whitelist of reddit usernames controlling access to these commands. This whitelist can only be updated via the API.
