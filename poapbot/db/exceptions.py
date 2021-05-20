@@ -7,6 +7,6 @@ class ConflictError(Exception):
     """Raised when a resource conflict occurs or a constraint is violated"""
 
 class BulkError(Exception):
-    """Raised when an error in encountered while processing bulk insert"""
+    """Raised when an error in encountered while processing bulk request"""
     def __init__(self, errors: List[Dict[Union[int,str], str]]):
         self.errors = errors
