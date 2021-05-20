@@ -17,4 +17,7 @@ fastapi:
   version: 0.1.0
   openapi_tags:
     - name: admin
+    - name: events
+    - name: claims
+    - name: export
     - name: scrape
