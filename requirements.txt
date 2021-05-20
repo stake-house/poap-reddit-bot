@@ -5,7 +5,7 @@ uvicorn[standard]==0.13.4
 asyncpraw==7.2.0
 pyyaml==5.4.1
 fastapi-crudrouter==0.7.1
-ormar[sqlite]==0.10.5
+ormar[sqlite]==0.10.8
 python-multipart==0.0.5
 pandas==1.2.4
 colorlog==5.0.1
