@@ -27,7 +27,9 @@ class RedditBot:
         self.command_handlers = {
             CreateEventCommand: self.create_event,
             UpdateEventCommand: self.update_event,
-            CreateClaimsCommand: self.create_claims
+            GetEventCommand: self.get_event,
+            CreateClaimsCommand: self.create_claims,
+            ReserveClaimsCommand: self.reserve_claims
         }
 
     async def reserve_claim(self, code: str, redditor: Redditor) -> Claim:
@@ -106,7 +108,34 @@ class RedditBot:
         except Exception as e:
             await self.send_response(message, f'Failed to update event: {e}')
 
+    async def get_event(self, message: Message, command_data: Dict[str, str]):
+        try:
+            event_id = command_data['id']
+            event = await self.db.get_event_by_id(event_id)
+            claims = await self.db.get_claims_by_event_id(event_id)
+            data = event.dict()
+            data['total_claims'] = len(claims)
+            data['reserved_claims'] = len([c for c in claims if c.reserved])
+            await self.send_response(message, str(data))
+        except DoesNotExist:
+            await self.send_response(message, f'Event with id {event_id} does not exist')
+        except Exception as e:
+            await self.send_response(message, f'Encountered an unexpected error: {e}')
+
     async def create_claims(self, message: Message, command_data: Dict[str, str]):
+        try:
+            event_id = command_data['event_id']
+            event = await self.db.get_event_by_id(event_id)
+            usernames = command_data['usernames'].split(',')
+            claims = await self.db.set_claims_bulk(event_id, usernames)
+            await self.send_response(message, f'Successfully reserved {len(claims)} claims to event {event.name}')
+        except DoesNotExist as e:
+            await self.send_response(message, str(e))
+        except Exception as e:
+            logger.error(f'Failed to reserve claims', exc_info=True)
+            await self.send_response(message, f'Failed to reserve claims: {e}')
+
+    async def reserve_claims(self, message: Message, command_data: Dict[str, str]):
         try:
             event_id = command_data['event_id']
             event = await self.db.get_event_by_id(event_id)
@@ -176,7 +205,7 @@ class RedditBot:
         if command:
             if not await self.is_admin(redditor):
                 logger.debug(f'Received request from {redditor.name} to {command.name}, but they are unauthorized')
-                await self.send_response(message, 'You are unauthorized to execute command: {command.name}')
+                await self.send_response(message, f'You are unauthorized to execute command: {command.name}')
             else:
                 await self.process_command(message, command)
         else:
