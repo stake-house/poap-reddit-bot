@@ -7,6 +7,7 @@
   * [Admin via Reddit](#admin-via-reddit)
       - [Create Event](#create-event)
       - [Update Event](#update-event)
+      - [Get Event](#get-event)
       - [Create Claims](#create-claims)
   * [Admin via API](#admin-via-api)
 - [Setup](#setup)
@@ -49,6 +50,10 @@ create_event event_id event_name event_code start_date expiry_date minimum_age m
 #### Update Event
 ```
 update_event event_id event_name event_code start_date expiry_date minimum_age minimum_karma
+```
+#### Get Event
+```
+get_event event_id
 ```
 #### Create Claims
 ```
