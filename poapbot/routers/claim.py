@@ -70,9 +70,9 @@ async def get_claims_by_event_id(event_id: str, db: POAPDatabase = Depends(get_d
     "/",
     tags=['claims']
 )
-async def create_claim(event_id: str, link: str, username: str = None, db: POAPDatabase = Depends(get_db)):
+async def create_claim(claim: ClaimCreate, db: POAPDatabase = Depends(get_db)):
     try:
-        return await db.create_claim(event_id, link, username)
+        return await db.create_claim(claim)
     except DoesNotExist as e:
         raise HTTPException(status_code=404, detail=str(e))
 
