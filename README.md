@@ -69,7 +69,7 @@ todo
 ## Clone
 First, clone the repository and change into the directory
 ```bash
-git clone https://github.com/badinvestment/poap-reddit-bot.git
+git clone https://github.com/stake-house/poap-reddit-bot.git
 cd poap-reddit-bot
 ```
 
