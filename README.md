@@ -85,7 +85,7 @@ reddit:
     password: <reddit_password>
     client_id: <app_client_id>
     client_secret: <app_client_secret>
-    user_agent: "POAPbot by /u/Bad_Investment https://github.com/badinvestment/poap-reddit-bot" # Optionally change this, but you don't need to
+    user_agent: "POAPbot by /u/Bad_Investment https://github.com/stake-house/poap-reddit-bot" # Optionally change this, but you don't need to
 
 db:
   url: sqlite:///poap.db # Optionally rename sqlite db file (Postgres support coming soon)
