@@ -4,13 +4,14 @@ from ormar.exceptions import NoMatch
 from .exceptions import BulkError, DoesNotExist, ConflictError, BulkError
 from .models import *
 from . import database
+from databases import Database
 from datetime import datetime
 from typing import List, Union, Dict, Tuple
 
 class POAPDatabase:
 
-    def __init__(self):
-        self.db = database
+    def __init__(self, db: Database = None):
+        self.db = db if db else database
 
     async def connect(self):
         if not self.db.is_connected:
