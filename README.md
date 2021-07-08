@@ -7,6 +7,7 @@
   * [Admin via Reddit](#admin-via-reddit)
       - [Create Event](#create-event)
       - [Update Event](#update-event)
+      - [Get Event](#get-event)
       - [Create Claims](#create-claims)
   * [Admin via API](#admin-via-api)
 - [Setup](#setup)
@@ -50,6 +51,10 @@ create_event event_id event_name event_code start_date expiry_date minimum_age m
 ```
 update_event event_id event_name event_code start_date expiry_date minimum_age minimum_karma
 ```
+#### Get Event
+```
+get_event event_id
+```
 #### Create Claims
 ```
 create_claims event_id code1,code2,code3
@@ -64,7 +69,7 @@ todo
 ## Clone
 First, clone the repository and change into the directory
 ```bash
-git clone https://github.com/badinvestment/poap-reddit-bot.git
+git clone https://github.com/stake-house/poap-reddit-bot.git
 cd poap-reddit-bot
 ```
 
@@ -80,7 +85,7 @@ reddit:
     password: <reddit_password>
     client_id: <app_client_id>
     client_secret: <app_client_secret>
-    user_agent: "POAPbot by /u/Bad_Investment https://github.com/badinvestment/poap-reddit-bot" # Optionally change this, but you don't need to
+    user_agent: "POAPbot by /u/Bad_Investment https://github.com/stake-house/poap-reddit-bot" # Optionally change this, but you don't need to
 
 db:
   url: sqlite:///poap.db # Optionally rename sqlite db file (Postgres support coming soon)
