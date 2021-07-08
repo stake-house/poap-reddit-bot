@@ -27,12 +27,12 @@ app.include_router(scrape.router)
 
 logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
 logger = logging.getLogger(__name__)
+
+app.state.db = POAPDatabase()
                 
 @app.on_event('startup')
 async def startup_event():
-    db = POAPDatabase()
-    await db.connect()
-    app.state.db = db
+    await app.state.db.connect()
 
     reddit_client = asyncpraw.Reddit(
         username=REDDIT_SETTINGS.auth.username,
@@ -42,7 +42,7 @@ async def startup_event():
         user_agent=REDDIT_SETTINGS.auth.user_agent
     )
     
-    bot = RedditBot(reddit_client, db)
+    bot = RedditBot(reddit_client, app.state.db)
     asyncio.create_task(bot.run())
 
     app.state.scraper = RedditScraper(reddit_client)
