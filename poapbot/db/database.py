@@ -108,7 +108,18 @@ class POAPDatabase:
 
     async def get_claims_by_event_id(self, event_id: str, select_related: List[str] = None, offset: int = 0, limit: int = 0) -> List[Claim]:
         try:
-            q = Claim.objects.filter(event__id=event_id).offset(offset)
+            q = Claim.objects.filter(event__id__exact=event_id).offset(offset)
+            if select_related:
+                q = q.select_related(select_related)
+            if limit > 0:
+                q = q.limit(limit)
+            return await q.all()
+        except NoMatch:
+            return []
+
+    async def get_available_claims_by_event_id(self, event_id: str, select_related: List[str] = None, offset: int = 0, limit: int = 0) -> List[Claim]:
+        try:
+            q = Claim.objects.filter(event__id__exact=event_id, reserved__exact=False).offset(offset)
             if select_related:
                 q = q.select_related(select_related)
             if limit > 0:
@@ -250,6 +261,20 @@ class POAPDatabase:
             raise DoesNotExist(f'Response message with id {id} does not exist') from e
 
     ## Bulk
+
+    async def set_claims_bulk(self, event_id: str, usernames: List[str]) -> List[Claim]:
+        async with self.db.transaction():
+            available_claims = await self.get_available_claims_by_event_id(event_id, limit=len(usernames))
+            if len(available_claims) < len(usernames):
+                raise DoesNotExist(f'Insufficient available claims: {len(available_claims)} available, {len(usernames)} requested')
+            for n, username in enumerate(usernames):
+                try:
+                    attendee = await self.get_attendee_by_username(username)
+                except DoesNotExist:
+                    attendee = await self.create_attendee_by_username(username)
+                available_claims[n].attendee = attendee
+                available_claims[n].reserved = True
+            await Claim.objects.bulk_update(available_claims)
 
     async def create_claims_bulk(self, event_id: str, new_claims: List[ClaimCreate]) -> List[Claim]:
         event = await self.get_event_by_id(event_id)
