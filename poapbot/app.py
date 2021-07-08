@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 import asyncio
 import yaml
-import logging
+import logging.config
 import asyncpraw
 
 from poapbot.settings import RedditSettings, FastAPISettings
