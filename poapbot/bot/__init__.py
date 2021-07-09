@@ -122,20 +122,27 @@ class RedditBot:
         except Exception as e:
             await self.send_response(message, f'Encountered an unexpected error: {e}')
 
-    async def create_claims(self, message: Message, command_data: Dict[str, str]):
+    async def reserve_claims(self, message: Message, command_data: Dict[str, str]):
         try:
             event_id = command_data['event_id']
             event = await self.db.get_event_by_id(event_id)
+        except DoesNotExist:
+            await self.send_response(message, f'Event {event_id} does not exist')
+            return
+
+        try:
             usernames = command_data['usernames'].split(',')
-            claims = await self.db.set_claims_bulk(event_id, usernames)
-            await self.send_response(message, f'Successfully reserved {len(claims)} claims to event {event.name}')
+            if len(set([u.lower() for u in usernames])) < len(usernames):
+                await self.send_response(message, f'Failed to reserve claims: Provided list of usernames contains duplicates')
+                return
+            await self.send_response(message, f'Successfully reserved {len(usernames)} claims to event {event.name}')
         except DoesNotExist as e:
             await self.send_response(message, str(e))
         except Exception as e:
             logger.error(f'Failed to reserve claims', exc_info=True)
             await self.send_response(message, f'Failed to reserve claims: {e}')
 
-    async def reserve_claims(self, message: Message, command_data: Dict[str, str]):
+    async def create_claims(self, message: Message, command_data: Dict[str, str]):
         try:
             event_id = command_data['event_id']
             event = await self.db.get_event_by_id(event_id)
