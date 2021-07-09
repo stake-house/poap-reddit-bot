@@ -7,7 +7,7 @@ reddit:
     user_agent: "POAPbot by /u/Bad_Investment https://github.com/badinvestment/poap-reddit-bot"
 
 db:
-  url: sqlite:///test.db
+  url: sqlite:///poap.db
 
 poap:
   url: https://poap.xyz/claim/
